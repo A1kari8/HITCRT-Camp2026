@@ -1,0 +1,10 @@
+.cache/
+
+assets/calibration.mp4
+assets/test*/
+
+build/*
+!build/bin/
+
+yolov11_train/dataset
+yolov11_train/runs/
