@@ -6,5 +6,7 @@ assets/test*/
 build/*
 !build/bin/
 
-yolov11_train/dataset
+yolov11_train/dataset*/
+yolov11_train/output*/
 yolov11_train/runs/
+yolov11_train/best*
