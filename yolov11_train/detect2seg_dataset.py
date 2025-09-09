@@ -3,9 +3,9 @@ import cv2
 import math
 import numpy as np
 
-image_dir = 'dataset3/train/images/'         
-label_dir = 'dataset3/train/labels/'          
-output_dir = 'dataset_seg/train/labels/'   
+image_dir = 'dataset4/valid/images/'         
+label_dir = 'dataset4/valid/labels/'          
+output_dir = 'dataset4_seg/valid/labels/'   
 
 num_points = 24               
 
