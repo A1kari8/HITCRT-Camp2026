@@ -10,3 +10,15 @@ yolov11_train/dataset*/
 yolov11_train/output*/
 yolov11_train/runs/
 yolov11_train/best*
+
+runs/
+
+yolov11_predict/sam*
+yolov11_predict/best-seg1s.pt
+yolov11_predict/bests_blur*
+yolov11_predict/lasts_*
+
+*/debug*
+
+*/*.mp4
+*.mp4
