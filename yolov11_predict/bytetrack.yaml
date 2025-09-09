@@ -1,0 +1,12 @@
+tracker_type: bytetrack
+track_high_thresh: 0.6           # 初次关联置信度要求较高，避免误匹配
+track_low_thresh: 0.03            # 第二次关联更宽松，提高容错率
+new_track_thresh: 0.4           # 控制新目标的创建，避免误判为新物体
+track_buffer: 100                 # 增加缓冲帧数，容忍物体短暂消失
+match_thresh: 0.6                # 提高匹配宽容度，减少 ID 断裂
+fuse_score: True                 # 融合置信度与空间信息，提升匹配稳定性
+gmc_method: sparseOptFlow        # 适用于轻微摄像机移动的场景
+proximity_thresh: 0.3            # ReID前的空间接近要求
+appearance_thresh: 0.25          # 外观相似度要求，适中即可
+with_reid: True                  # 启用 ReID，BoT-SORT 专属
+model: auto                      # 使用默认外观模型（YOLO特征）

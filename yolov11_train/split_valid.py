@@ -27,9 +27,9 @@ def split_train_to_valid(image_dir, label_dir, valid_image_dir, valid_label_dir,
     print(f"{num_valid} 个移动到验证集")
 
 split_train_to_valid(
-    image_dir='dataset/train/images',
-    label_dir='dataset/train/labels',
-    valid_image_dir='dataset/valid/images',
-    valid_label_dir='dataset/valid/labels',
-    ratio=0.2 
+    image_dir='video_data_seg/train/images/',
+    label_dir='video_data_seg/train/labels/',
+    valid_image_dir='video_data_seg/valid/images/',
+    valid_label_dir='video_data_seg/valid/labels/',
+    ratio=0.1
 )

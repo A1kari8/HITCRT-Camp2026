@@ -2,8 +2,8 @@ import os
 import cv2
 import numpy as np
 
-image_dir = 'dataset_seg/train/images/'         
-label_dir = 'dataset_seg/train/labels/'     
+image_dir = 'video_data_seg/train/images/'         
+label_dir = 'video_data_seg/train/labels/'     
 
 def draw_mask(image, points, color=(0, 255, 0)):
     """绘制多边形掩码"""
