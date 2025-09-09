@@ -3,6 +3,7 @@
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <unordered_map>
+#include <vector>
 
 #include "KalmanFilter.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
@@ -54,6 +55,11 @@ class KalmanFilterNode : public rclcpp::Node {
 
     float lastFrameNum = 0;
     bool firstCall = true;
+
+    std::vector<float> lastMeasurement;
+    std::vector<float> lastVelocity;
+
+    rclcpp::Time lastMsgTime = this->get_clock()->now();
 
     std::unordered_map<int, std::unique_ptr<KalmanFilter>> m_kalmanFiltersMap;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr

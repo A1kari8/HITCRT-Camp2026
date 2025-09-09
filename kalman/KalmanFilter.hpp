@@ -1,6 +1,7 @@
 #pragma once
 #include <Eigen/Dense>
 #include <vector>
+
 #include "Eigen/src/Core/Matrix.h"
 
 #ifndef FPS_RATE
@@ -11,7 +12,7 @@
  * @brief 通用6维卡尔曼滤波器，支持三维位置与速度估计。
  */
 class KalmanFilter {
-public:
+   public:
     /**
      * @brief 构造函数，初始化卡尔曼滤波状态。
      * @param x 初始x坐标
@@ -19,7 +20,8 @@ public:
      * @param z 初始z坐标
      * @param dt 状态转移步长，默认1/20秒
      */
-    KalmanFilter(float x, float y, float z, float dt = 1.0f/(30.0f * FPS_RATE));
+    KalmanFilter(float x, float y, float z,
+                 float dt = 1.0f / (30.0f * FPS_RATE));
 
     /**
      * @brief 仅用模型预测推进状态。
@@ -42,18 +44,22 @@ public:
      */
     std::vector<float> getState() const;
 
+    void setStatePos(float x, float y, float z);
+    void setStateVelocity(float vx, float vy, float vz);
+    void setStateAcceleration(float ax, float ay, float az);
+
     // /**
     //  * @brief 预测未来若干步的轨迹。
     //  * @param xyz 输出，每步[x, y, z]
     //  * @param steps 预测步数
     //  */
     // void predictTrajectory(std::vector<float>& xyz, int steps) const;
-
-private:
-    Eigen::Matrix<float, 9, 1> m_state; ///< 状态向量[x, y, z, vx, vy, vz]
-    Eigen::Matrix<float, 9, 9> m_covariance; ///< 协方差矩阵
-    Eigen::Matrix<float, 9, 9> m_transition; ///< 状态转移矩阵
-    Eigen::Matrix<float, 9, 9> m_processNoise; ///< 过程噪声协方差
-    Eigen::Matrix<float, 3, 9> m_observation; ///< 观测矩阵
-    Eigen::Matrix3f m_observationNoise; ///< 观测噪声协方差
+    
+   private:
+    Eigen::Matrix<float, 9, 1> m_state;  ///< 状态向量[x, y, z, vx, vy, vz]
+    Eigen::Matrix<float, 9, 9> m_covariance;    ///< 协方差矩阵
+    Eigen::Matrix<float, 9, 9> m_transition;    ///< 状态转移矩阵
+    Eigen::Matrix<float, 9, 9> m_processNoise;  ///< 过程噪声协方差
+    Eigen::Matrix<float, 3, 9> m_observation;   ///< 观测矩阵
+    Eigen::Matrix3f m_observationNoise;         ///< 观测噪声协方差
 };

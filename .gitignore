@@ -3,13 +3,14 @@
 assets/calibration.mp4
 assets/test*/
 
-build/*
-!build/bin/
+build/
+
 
 yolov11_train/dataset*/
 yolov11_train/output*/
 yolov11_train/runs/
 yolov11_train/best*
+yolov11_train/video*
 
 runs/
 
@@ -22,3 +23,8 @@ yolov11_predict/lasts_*
 
 */*.mp4
 *.mp4
+yolov11_predict/best-blur-188.pt
+yolov11_predict/best-blur-116.pt
+.gitignore
+yolov11_predict/last-blur-188.pt
+

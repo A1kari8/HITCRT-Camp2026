@@ -19,8 +19,8 @@ KalmanFilter::KalmanFilter(float x, float y, float z, float dt) {
         0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1;
 
-    // 过程噪声协方差
-    float sigma_a = 1.0f;  // 加速度标准差，可根据实际情况调整
+    // 过程噪声协方差（优化：减小sigma_a）
+    float sigma_a = 0.1f;  // 优化后加速度标准差
 
     m_processNoise = Eigen::Matrix<float, 9, 9>::Zero();
 
@@ -38,20 +38,20 @@ KalmanFilter::KalmanFilter(float x, float y, float z, float dt) {
     m_observation << 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         1, 0, 0, 0, 0, 0, 0;
 
-    // 观测噪声协方差
-    float sigma_x = 0.05f;  // 单位：米
-    float sigma_y = 0.05f;
-    float sigma_z = 0.1f;
+    // 观测噪声协方差（优化：减小观测噪声）
+    float sigma_x = 0.02f;  // 优化后
+    float sigma_y = 0.02f;
+    float sigma_z = 0.05f;
 
     m_observationNoise << sigma_x * sigma_x, 0, 0, 0, sigma_y * sigma_y, 0, 0,
         0, sigma_z * sigma_z;
 
-    // 状态初始化，速度为0
+    // 状态初始化，速度为0，加速度为0（优化）
     m_state.setZero();
     m_state(0) = x;
     m_state(1) = y;
     m_state(2) = z;
-    // m_state(8) = -9.8f;
+    m_state(8) = 0.0f;
 
     // 协方差初始化为单位阵
     m_covariance = Eigen::Matrix<float, 9, 9>::Identity();
@@ -103,6 +103,24 @@ void KalmanFilter::update(float x, float y, float z) {
  */
 std::vector<float> KalmanFilter::getState() const {
     return std::vector<float>{m_state(0), m_state(1), m_state(2)};
+}
+
+void KalmanFilter::setStatePos(float x, float y, float z) {
+    m_state(0) = x;
+    m_state(1) = y;
+    m_state(2) = z;
+}
+
+void KalmanFilter::setStateVelocity(float vx, float vy, float vz) {
+    m_state(3) = vx;
+    m_state(4) = vy;
+    m_state(5) = vz;
+}
+
+void KalmanFilter::setStateAcceleration(float ax, float ay, float az) {
+    m_state(6) = ax;
+    m_state(7) = ay;
+    m_state(8) = az;
 }
 
 // /**

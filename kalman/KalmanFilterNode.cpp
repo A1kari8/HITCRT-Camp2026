@@ -24,6 +24,11 @@ void KalmanFilterNode::ballPositionCallback(
     const std_msgs::msg::Float32MultiArray::ConstSharedPtr msg) {
     if (msg->data.size() < 5) return;
 
+    rclcpp::Time current_time = this->get_clock()->now();
+    rclcpp::Duration delta = current_time - lastMsgTime;
+    double dt = delta.seconds();  // 秒为单位
+    lastMsgTime = current_time;
+
     int ballId = static_cast<int>(msg->data[0]);
     float posX = msg->data[1];
     float posY = msg->data[2];
@@ -32,6 +37,8 @@ void KalmanFilterNode::ballPositionCallback(
 
     if (firstCall) {
         lastFrameNum = frameNum;
+        lastMeasurement = {posX, posY, posZ};
+        lastVelocity = {0.0f, 0.0f, 0.0f};
         firstCall = false;
     }
 
@@ -47,6 +54,29 @@ void KalmanFilterNode::ballPositionCallback(
         interpolateFrames(ballId, lastFrameNum, frameNum);
     }
     lastFrameNum = frameNum;
+
+    m_kalmanFiltersMap[ballId]->update(posX, posY, posZ);
+    m_kalmanFiltersMap[ballId]->setStatePos(posX, posY, posZ);
+    if (!firstCall) {
+        m_kalmanFiltersMap[ballId]->setStateVelocity(
+            (posX - lastMeasurement[0]) / dt, (posY - lastMeasurement[1]) / dt,
+            (posZ - lastMeasurement[2]) / dt);
+
+        m_kalmanFiltersMap[ballId]->setStateAcceleration(
+            (((posX - lastMeasurement[0]) / dt) - lastVelocity[0]) / dt,
+            (((posY - lastMeasurement[1]) / dt) - lastVelocity[1]) / dt,
+            (((posZ - lastMeasurement[2]) / dt) - lastVelocity[2]) / dt
+        );
+
+        lastVelocity = {
+            static_cast<float>((posX - lastMeasurement[0]) / dt),
+            static_cast<float>((posY - lastMeasurement[1]) / dt),
+            static_cast<float>((posZ - lastMeasurement[2]) / dt)
+        };
+        
+    }
+
+    lastMeasurement = {posX, posY, posZ};
 
     m_kalmanFiltersMap[ballId]->predict();
     m_kalmanFiltersMap[ballId]->update(posX, posY, posZ);
