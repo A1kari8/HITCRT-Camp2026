@@ -2,11 +2,9 @@
 #include <Eigen/Dense>
 #include <vector>
 
-#include "Eigen/src/Core/Matrix.h"
-
-#ifndef FPS_RATE
-#define FPS_RATE 4  // fallback
-#endif
+// #ifndef FPS_RATE
+#define FPS_RATE 12  // fallback
+// #endif
 
 /**
  * @brief 通用6维卡尔曼滤波器，支持三维位置与速度估计。
@@ -21,7 +19,7 @@ class KalmanFilter {
      * @param dt 状态转移步长，默认1/20秒
      */
     KalmanFilter(float x, float y, float z,
-                 float dt = 1.0f / (30.0f * FPS_RATE));
+                 float dt = 1.0f / (21.0f * FPS_RATE));
 
     /**
      * @brief 仅用模型预测推进状态。
@@ -55,7 +53,13 @@ class KalmanFilter {
     //  */
     // void predictTrajectory(std::vector<float>& xyz, int steps) const;
     
-   private:
+    std::vector<float> lastMeasurement;
+    std::vector<float> lastVelocity;
+
+    bool firstCall = true;
+    bool secondCall = true;
+
+   protected:
     Eigen::Matrix<float, 9, 1> m_state;  ///< 状态向量[x, y, z, vx, vy, vz]
     Eigen::Matrix<float, 9, 9> m_covariance;    ///< 协方差矩阵
     Eigen::Matrix<float, 9, 9> m_transition;    ///< 状态转移矩阵

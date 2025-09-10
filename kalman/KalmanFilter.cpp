@@ -2,8 +2,6 @@
 
 #include <vector>
 
-#include "Eigen/src/Core/Matrix.h"
-
 /**
  * @brief 构造函数，初始化卡尔曼滤波状态和各类矩阵。
  * @param x 初始x坐标
@@ -20,7 +18,7 @@ KalmanFilter::KalmanFilter(float x, float y, float z, float dt) {
         0, 0, 1;
 
     // 过程噪声协方差（优化：减小sigma_a）
-    float sigma_a = 0.1f;  // 优化后加速度标准差
+    float sigma_a = 0.3f;  // 优化后加速度标准差
 
     m_processNoise = Eigen::Matrix<float, 9, 9>::Zero();
 
@@ -39,9 +37,9 @@ KalmanFilter::KalmanFilter(float x, float y, float z, float dt) {
         1, 0, 0, 0, 0, 0, 0;
 
     // 观测噪声协方差（优化：减小观测噪声）
-    float sigma_x = 0.02f;  // 优化后
-    float sigma_y = 0.02f;
-    float sigma_z = 0.05f;
+    float sigma_x = 0.000001f;  // 优化后
+    float sigma_y = 0.000001f;
+    float sigma_z = 0.000001f;
 
     m_observationNoise << sigma_x * sigma_x, 0, 0, 0, sigma_y * sigma_y, 0, 0,
         0, sigma_z * sigma_z;

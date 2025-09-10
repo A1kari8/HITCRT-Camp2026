@@ -3,10 +3,11 @@
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <unordered_map>
-#include <vector>
 
-#include "KalmanFilter.hpp"
+#include "UnscentedKalmanFilter.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
+
+#define FILTER UnscentedKalmanFilter
 
 /**
  * @brief
@@ -14,6 +15,15 @@
  *
  * 输入话题：ball_position（Float32MultiArray，每5个float为一组[id, x, y, z,
  * t]） 输出话题：ball_trajectory（Float32MultiArray，插帧后轨迹，格式同上）
+ */
+/**
+ * @brief
+ * ROS2节点：负责接收篮球检测结果，进行卡尔曼滤波插帧，并周期性发布平滑轨迹。
+ *
+ * 输入话题：ball_position（Float32MultiArray，每5个float为一组[id, x, y, z,
+ * t]） 输出话题：ball_trajectory（Float32MultiArray，插帧后轨迹，格式同上）
+ *
+ * 支持普通卡尔曼和无迹卡尔曼滤波器，通过模板参数FilterType指定。
  */
 class KalmanFilterNode : public rclcpp::Node {
    public:
@@ -54,14 +64,9 @@ class KalmanFilterNode : public rclcpp::Node {
     void publishTrajectory(int ballId, float frameNum);
 
     float lastFrameNum = 0;
-    bool firstCall = true;
-
-    std::vector<float> lastMeasurement;
-    std::vector<float> lastVelocity;
-
     rclcpp::Time lastMsgTime = this->get_clock()->now();
-
-    std::unordered_map<int, std::unique_ptr<KalmanFilter>> m_kalmanFiltersMap;
+    float dt_frame;
+    std::unordered_map<int, std::unique_ptr<FILTER>> m_kalmanFiltersMap;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr
         m_subscription;  ///< 订阅检测结果
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr
