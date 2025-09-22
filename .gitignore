@@ -30,3 +30,13 @@ yolov11_predict/last-blur-188.pt
 
 yolov11_predict/clear.jpg
 yolov11_predict/best-blur-200.pt
+yolov11_predict/bests-blur-video.pt
+
+basketball/.cache
+basketball/build
+basketball/install
+basketball/log
+basketball/src/assets/best-blur-video.pt
+basketball/src/assets/v1.pt
+basketball/src/assets/pytorch_model.bin
+basketball/src/*/*/__pycache__

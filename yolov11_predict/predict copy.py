@@ -9,21 +9,13 @@ from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
 from typing import Tuple, Dict, List, Any
 from collections import defaultdict
-from skimage import restoration
 
+
+
+# 路径配置
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, 'best-blur-video.pt')
-VIDEO_PATH = os.path.join(BASE_DIR, '..', 'assets', 'test4', 'rgb.mp4')
-DEPTH_PATH = os.path.join(BASE_DIR, '..', 'assets', 'test4', 'depth.mp4')
-
-# 加载清楚的篮球图像
-BALL_CLEAR_PATH = os.path.join(BASE_DIR, 'clear.jpg')
-if os.path.exists(BALL_CLEAR_PATH):
-    ball_clear = cv2.imread(BALL_CLEAR_PATH)
-    ball_clear = cv2.resize(ball_clear, (50, 50))  # 假设大小
-else:
-    ball_clear = None
-
+VIDEO_PATH = os.path.join(BASE_DIR, '..', 'assets', 'test3', 'rgb.mp4')
 
 
 def load_camera_params() -> Tuple[np.ndarray, np.ndarray]:
@@ -101,9 +93,6 @@ def detect_and_publish(
 
     model = YOLO(model_path)
     cap = cv2.VideoCapture(video_path)
-    cap_depth = cv2.VideoCapture(DEPTH_PATH)
-    print(f"[DEBUG] Depth path: {DEPTH_PATH}")
-    print(f"[DEBUG] Cap depth opened: {cap_depth.isOpened()}")
     yolo_input_size = 640
     frame_count = 0
     track_history = defaultdict(list)
@@ -114,64 +103,23 @@ def detect_and_publish(
     # 光流相关变量
     prev_frame = None
     prev_gray = None
-    prev_depth_gray = None
 
     while cap.isOpened():
         frame_count += 1
         success, frame = cap.read()
-        success_depth, depth_frame = cap_depth.read()
-        if not success or not success_depth:
-            print(f"[DEBUG] Failed to read frame {frame_count}, rgb: {success}, depth: {success_depth}")
+        if not success:
             break
 
         # 转换为灰度图用于光流
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        depth_gray = cv2.cvtColor(depth_frame, cv2.COLOR_BGR2GRAY) if len(depth_frame.shape) == 3 else depth_frame
 
         # 计算光流
-        flow = np.zeros((gray.shape[0], gray.shape[1], 2), dtype=np.float32)
-        combined_mask = np.zeros(gray.shape, dtype=bool)  # 初始化
-        motion_pixels = 0
-        color_pixels = 0
-        combined_pixels = 0
-        # print(f"[DEBUG] Frame {frame_count}: prev_gray is None: {prev_gray is None}")
+        flow = None
         if prev_gray is not None:
-            flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, flow, 0.5, 3, 15, 3, 5, 1.2, 0)
+            flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
             # 计算运动幅度
             mag, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
-            motion_mask = mag > 0.1  # 进一步降低运动阈值到0.1
-            motion_pixels = np.sum(motion_mask)
-
-            # 深度运动检测
-            if prev_depth_gray is not None:
-                depth_diff = cv2.absdiff(depth_gray, prev_depth_gray)
-                depth_mask = depth_diff > 1  # 进一步降低深度阈值
-                depth_pixels = np.sum(depth_mask)
-            else:
-                depth_mask = np.zeros(gray.shape, dtype=bool)
-                depth_pixels = 0
-
-            # 颜色检测（扩大范围包括棕色虚影）
-            if len(frame.shape) == 3:
-                hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-                lower_color = np.array([0, 10, 10])  # 扩大下限
-                upper_color = np.array([40, 255, 255])  # 扩大上限包括棕色
-                color_mask = cv2.inRange(hsv_frame, lower_color, upper_color)
-                color_pixels = np.sum(color_mask > 0)
-            else:
-                color_mask = np.zeros(gray.shape, dtype=np.uint8)
-                color_pixels = 0
-                # print(f"[DEBUG] Frame {frame_count}: Gray frame, skipping color detection")
-            
-            # 结合RGB运动和颜色（移除depth）
-            if color_pixels > 0:
-                combined_mask = motion_mask & (color_mask > 0)
-            else:
-                combined_mask = motion_mask
-            
-            combined_pixels = np.sum(combined_mask)
-
-            # print(f"[DEBUG] Frame {frame_count}: shape={frame.shape}, motion_pixels={motion_pixels}, depth_pixels={depth_pixels}, color_pixels={color_pixels}, combined_pixels={combined_pixels}, mag_max={np.max(mag)}, mag_mean={np.mean(mag):.4f}, gray_diff={np.sum(np.abs(gray.astype(np.int32) - prev_gray.astype(np.int32)))}")
+            motion_mask = mag > 2.0  # 运动阈值
 
             # 可视化光流（可选）
             hsv = np.zeros_like(frame)
@@ -182,32 +130,16 @@ def detect_and_publish(
             hsv[..., 2] = mag_norm
             flow_bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-            # 在运动区域增强帧（轻度增强，避免过度处理）
+            # 在运动区域增强帧（简单锐化）
             kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-            sharpened = cv2.filter2D(frame, -1, kernel)
-            
-            # 双边滤波去噪（轻度）
-            denoised = cv2.bilateralFilter(sharpened, 5, 50, 50)
-            
-            # 跳过去模糊和gamma，CLAHE（轻度）
-            lab = cv2.cvtColor(denoised, cv2.COLOR_BGR2LAB)
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-            lab[..., 0] = clahe.apply(lab[..., 0])
-            enhanced_frame = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
-            
-            frame = np.where(combined_mask[..., None], enhanced_frame, frame)
+            enhanced_frame = cv2.filter2D(frame, -1, kernel)
+            frame = np.where(motion_mask[..., None], enhanced_frame, frame)
 
-        # 贴上清楚篮球图像的功能已删除
-
-        # # 保存处理后的帧用于调试
-        # debug_path = os.path.join(debug_dir, f'frame_{frame_count:04d}_processed.jpg')
-        # cv2.imwrite(debug_path, frame)
-        # print(f"[DEBUG] Saved processed frame: {debug_path}")
-
-    
+        # 更新上一帧
+        prev_gray = gray.copy()
 
         # 检测与跟踪
-        result = model.track(frame, persist=True, imgsz=yolo_input_size, conf=0.4, iou=0.1, max_det=2, tracker=os.path.join(BASE_DIR, 'bytetrack.yaml'))[0]
+        result = model.track(frame, persist=True, imgsz=yolo_input_size, conf=0.5, iou=0.1, max_det=2, tracker=os.path.join(BASE_DIR, 'bytetrack.yaml'))[0]
         
         if not result.boxes:
             continue
@@ -249,24 +181,20 @@ def detect_and_publish(
                 ], dtype=np.float32)
                 # 打印solvePnP输入
                 print(f"[PnP] img center=({x:.1f},{y:.1f}), r={radius:.1f}, frame={frame_count}")
-                # print(f"[PnP] object_points(m): {object_points.tolist()}")
+                print(f"[PnP] object_points(m): {object_points.tolist()}")
                 print(f"[PnP] image_points(px): {image_points.tolist()}")
                 success_pnp, rvec, tvec = cv2.solvePnP(
                     object_points, image_points, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
                 if success_pnp:
                     # 打印三维点
-                    # print(f"[PnP] tvec(m): {tvec.ravel().tolist()}")
+                    print(f"[PnP] tvec(m): {tvec.ravel().tolist()}")
                     # 正确投影三维球心到像素
                     X = np.array([[0, 0, 0]], dtype=np.float32)  # 球心在自身坐标系原点
                     imgpt, _ = cv2.projectPoints(X, rvec, tvec, camera_matrix, dist_coeffs)
                     u, v = float(imgpt[0][0][0]), float(imgpt[0][0][1])
-                    # print(f"[PnP] 球心投影像素: ({u:.1f},{v:.1f})")
+                    print(f"[PnP] 球心投影像素: ({u:.1f},{v:.1f})")
                     node.publish_positions(Ball(track_id, tvec[0][0], tvec[1][0], tvec[2][0], x, y, frame_count))
-        # 更新prev_gray
-        prev_gray = gray.copy()
-        prev_depth_gray = depth_gray.copy()
     cap.release()
-    cap_depth.release()
 
 
 def main() -> None:

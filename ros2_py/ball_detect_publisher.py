@@ -9,7 +9,7 @@ import json
 from typing import Dict, List, Tuple, Any
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-video_path = os.path.join(BASE_DIR, '..', 'assets', 'test3', 'rgb.mp4')
+video_path = os.path.join(BASE_DIR, '..', 'assets', 'test4', 'rgb.mp4')
 output_path = os.path.join(BASE_DIR, '..', 'output_with_trajectory.mp4')
 
 class Frame2Draw():
@@ -121,24 +121,32 @@ class BallDetectPublisher(Node):
         height: int
     ) -> None:
         """
-        在单帧上绘制所有球的历史轨迹点，并连线。
+        在单帧上绘制所有球的最近历史轨迹点，只保留固定数量的点。
         """
+        trail_length = 170  # 保留最近10个点
         for ballId, frame2Draws in self.tracks.items():
             color = self.color_map.get(ballId)
             if color is None:
                 color = self.color_list[ballId % len(self.color_list)]
                 self.color_map[ballId] = color
-            for frame2Draw in frame2Draws:
+            
+            # 只取最近 trail_length 个点
+            recent_draws = frame2Draws[-trail_length:] if len(frame2Draws) > trail_length else frame2Draws
+            
+            for i, frame2Draw in enumerate(recent_draws):
                 # 正确投影：三维点为相机坐标系下球心，投影球心(0,0,0)
                 X = np.array([[0, 0, 0]], dtype=np.float32)
                 rvec = np.zeros((3, 1), dtype=np.float32)
                 tvec = np.array([[frame2Draw.posX], [frame2Draw.posY], [frame2Draw.posZ]], dtype=np.float32)
                 imgpt, _ = cv2.projectPoints(X, rvec, tvec, self.camera_matrix, self.dist_coeffs)
                 u, v = float(imgpt[0][0][0]), float(imgpt[0][0][1])
-                # 调试输出
-                # print(f"[DRAW][frame={frame2Draw.frameNum}] 3D=({frame2Draw.posX:.4f},{frame2Draw.posY:.4f},{frame2Draw.posZ:.4f}) -> pixel=({u:.1f},{v:.1f}) cam_mat={self.camera_matrix.flatten().tolist()} dist={self.dist_coeffs.flatten().tolist()}")
                 if 0 <= u < width and 0 <= v < height:
-                    cv2.circle(frame, (int(u), int(v)), 5, color, -1)
+                    # 根据深度调整点大小：近大远小
+                    radius = int(45 / (frame2Draw.posZ * 2))
+                    # 根据时间顺序调整颜色深浅：越旧越暗，越新越亮
+                    alpha = (i + 1) / len(recent_draws)
+                    color_fade = tuple(int(c * alpha) for c in color)
+                    cv2.circle(frame, (int(u), int(v)), radius, color_fade, -1)
 
 
 

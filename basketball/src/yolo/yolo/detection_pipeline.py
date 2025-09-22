@@ -1,0 +1,187 @@
+"""
+检测流水线模块
+"""
+
+import os
+import cv2
+import torch
+import timm
+import numpy as np
+from collections import defaultdict
+from ultralytics import YOLO
+import supervision as sv
+from typing import TYPE_CHECKING
+
+from ament_index_python.packages import get_package_share_directory
+from trackers.core.deepsort.feature_extractor import DeepSORTFeatureExtractor
+from trackers.core.deepsort.tracker import DeepSORTTracker
+
+from .ball_detection import BallDetection
+
+if TYPE_CHECKING:
+    from .ball_publisher import BallPublisher
+
+
+class DetectionPipeline:
+    """
+    篮球检测和跟踪流水线。
+    """
+    def __init__(self, model_path: str, video_path: str):
+        self.model = YOLO(model_path)
+        self.video_path = video_path
+        self.yolo_input_size = 640
+
+    def process_with_yolo_tracking(
+        self,
+        camera_matrix: np.ndarray,
+        dist_coeffs: np.ndarray,
+        publisher: 'BallPublisher'
+    ) -> None:
+        """
+        使用 YOLO 内置跟踪进行检测和发布。
+        """
+        cap = cv2.VideoCapture(self.video_path)
+        frame_count = 0
+        track_history = defaultdict(list)
+
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        print(f"[INFO] 视频FPS: {fps}")
+        publisher.publish_fps(fps)
+
+        tracker_config = os.path.join(get_package_share_directory('assets'), 'mytracker.yaml')
+
+        while cap.isOpened():
+            success, frame = cap.read()
+            frame_count = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+
+            if not success:
+                print("视频读取完毕或出错")
+                break
+
+            # 使用 YOLO 跟踪
+            result = self.model.track(
+                frame,
+                imgsz=self.yolo_input_size,
+                conf=0.4,
+                iou=0.1,
+                max_det=2,
+                tracker=tracker_config
+            )[0]
+
+            if not result.boxes:
+                continue
+
+            xywh_boxes = result.boxes.xywh.cpu().numpy()  # type: ignore
+            track_ids = result.boxes.id.int().cpu().tolist() if result.boxes.id is not None else [2]  # type: ignore
+            # 标准化跟踪 ID
+            track_ids = [1 if tid == 1 else 2 for tid in track_ids]
+
+            for xywh_box, track_id in zip(xywh_boxes, track_ids):
+                x, y, w, h = xywh_box
+                radius = float(h / 2.0)
+                center_x = float(x)
+                center_y = float(y)
+
+                print(f"[DETECT] id={track_id}, x={center_x:.1f}, y={center_y:.1f}, w={w:.1f}, h={h:.1f}, frame={frame_count}")
+
+                track_history[track_id].append((center_x, center_y))
+
+                if radius > 5:
+                    # 计算三维位置
+                    position_3d = BallDetection.calculate_3d_position(
+                        center_x, center_y, radius, camera_matrix, dist_coeffs
+                    )
+
+                    if position_3d:
+                        x_3d, y_3d, z_3d = position_3d
+                        ball_detection = BallDetection(
+                            track_id, x_3d, y_3d, z_3d, center_x, center_y, frame_count
+                        )
+                        publisher.publish_position(ball_detection)
+
+        cap.release()
+
+    def process_with_deepsort(
+        self,
+        camera_matrix: np.ndarray,
+        dist_coeffs: np.ndarray,
+        publisher: 'BallPublisher'
+    ) -> None:
+        """
+        使用 DeepSORT 进行检测和跟踪。
+        """
+        cap = cv2.VideoCapture(self.video_path)
+        frame_count = 0
+
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        print(f"[INFO] 视频FPS: {fps}")
+        publisher.publish_fps(fps)
+
+        # 初始化 DeepSORT
+        timm_model = timm.create_model("resnetblur50", pretrained=False)
+        state_dict = torch.load(
+            os.path.join(get_package_share_directory('assets'), 'pytorch_model.bin'),
+            map_location="cpu"
+        )
+        timm_model.load_state_dict(state_dict)
+
+        feature_extractor = DeepSORTFeatureExtractor(
+            timm_model,
+            device="cuda",
+            input_size=(128, 128)
+        )
+
+        tracker = DeepSORTTracker(
+            feature_extractor=feature_extractor,
+            device="cuda",
+            lost_track_buffer=50,
+            appearance_weight=0.7
+        )
+
+        while cap.isOpened():
+            success, frame = cap.read()
+            frame_count = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+
+            if not success:
+                print("视频读取完毕或出错")
+                break
+
+            # 检测
+            result = self.model.predict(source=frame, conf=0.21, iou=0.1, max_det=2)[0]
+            detections = sv.Detections.from_ultralytics(result)
+            detections = tracker.update(detections, frame)
+
+            xyxy_boxes = detections.xyxy
+            track_ids = detections.tracker_id
+
+            if len(xyxy_boxes) == 0 or track_ids is None:
+                continue
+
+            for xyxy, track_id in zip(xyxy_boxes, track_ids):
+                x1, y1, x2, y2 = xyxy
+                center_x = (x2 - x1) / 2 + x1
+                center_y = (y2 - y1) / 2 + y1
+                w = x2 - x1
+                h = y2 - y1
+                radius = float(h / 2.0)
+
+                # 标准化跟踪 ID
+                if track_id != 0:
+                    track_id = 1
+
+                print(f"[DETECT] id={track_id}, x={center_x:.1f}, y={center_y:.1f}, w={w:.1f}, h={h:.1f}, frame={frame_count}")
+
+                if radius > 5:
+                    # 计算三维位置
+                    position_3d = BallDetection.calculate_3d_position(
+                        center_x, center_y, radius, camera_matrix, dist_coeffs
+                    )
+
+                    if position_3d:
+                        x_3d, y_3d, z_3d = position_3d
+                        ball_detection = BallDetection(
+                            track_id, x_3d, y_3d, z_3d, center_x, center_y, frame_count
+                        )
+                        publisher.publish_position(ball_detection)
+
+        cap.release()
