@@ -4,6 +4,7 @@
 """
 
 import os
+import tomllib
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 
@@ -12,8 +13,15 @@ from .ball_publisher import BallPublisher
 from .detection_pipeline import DetectionPipeline
 
 # 路径配置
-MODEL_PATH = os.path.join(get_package_share_directory('assets'), 'best-blur-video.pt')
-VIDEO_PATH = os.path.join(get_package_share_directory('assets'), 'test5', 'rgb.mp4')
+BASE_DIR = get_package_share_directory('assets')
+CONFIG_PATH = os.path.join(BASE_DIR, 'config.toml')
+
+# 加载配置
+with open(CONFIG_PATH, 'rb') as f:
+    config = tomllib.load(f)
+
+MODEL_PATH = os.path.join(BASE_DIR, config['paths']['model_path'])
+VIDEO_PATH = os.path.join(BASE_DIR, config['paths']['video_path'])
 
 
 def main() -> None:

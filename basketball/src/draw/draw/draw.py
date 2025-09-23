@@ -7,6 +7,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
 import os
+import tomllib
 from typing import Dict
 from ament_index_python.packages import get_package_share_directory
 
@@ -15,8 +16,14 @@ from .camera_utils import load_camera_params
 from .video_processor import VideoProcessor
 
 BASE_DIR = get_package_share_directory('assets')
-VIDEO_PATH = os.path.join(BASE_DIR, 'test5', 'rgb.mp4')
-OUTPUT_PATH = os.path.join(BASE_DIR, 'output_with_trajectory.mp4')
+CONFIG_PATH = os.path.join(BASE_DIR, 'config.toml')
+
+# 加载配置
+with open(CONFIG_PATH, 'rb') as f:
+    config = tomllib.load(f)
+
+VIDEO_PATH = os.path.join(BASE_DIR, config['paths']['video_path'])
+OUTPUT_PATH = os.path.join(BASE_DIR, config['paths']['output_path'])
 
 
 class TrajectoryVisualizer(Node):
@@ -44,12 +51,12 @@ class TrajectoryVisualizer(Node):
         self.video_processor = VideoProcessor(VIDEO_PATH, OUTPUT_PATH)
 
         # 绘制模式配置
-        self.declare_parameter('trail_length', 170)  # 轨迹长度（最近n个点）
-        self.declare_parameter('enable_color_fade', True)  # 是否启用颜色渐变（近深远浅）
-        self.declare_parameter('enable_size_variation', True)  # 是否启用大小变化（近大远小）
-        self.declare_parameter('base_radius', 30)  # 基准半径
-        self.declare_parameter('max_trail_length', 300)  # 最大轨迹长度限制
-        self.declare_parameter('enable_interpolation_color', False)  # 是否启用插帧颜色区分
+        self.declare_parameter('trail_length', config['draw']['trail_length'])  # 轨迹长度（最近n个点）
+        self.declare_parameter('enable_color_fade', config['draw']['enable_color_fade'])  # 是否启用颜色渐变（近深远浅）
+        self.declare_parameter('enable_size_variation', config['draw']['enable_size_variation'])  # 是否启用大小变化（近大远小）
+        self.declare_parameter('base_radius', config['draw']['base_radius'])  # 基准半径
+        self.declare_parameter('max_trail_length', config['draw']['max_trail_length'])  # 最大轨迹长度限制
+        self.declare_parameter('enable_interpolation_color', config['draw']['enable_interpolation_color'])  # 是否启用插帧颜色区分
 
         # 状态变量
         self.last_frame_num = None

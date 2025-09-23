@@ -75,7 +75,7 @@ ros2 run draw draw --ros-args -p trail_length:=50 -p enable_color_fade:=false -p
 #### 插帧颜色区分模式
 
 ```bash
-ros2 run draw draw --ros-args -p enable_interpolation_color:=true -p trail_length:=100
+ros2 run draw draw --ros-args -p enable_interpolation_color:=true -p trail_length:=10000
 ```
 
 - 插帧颜色区分：开启

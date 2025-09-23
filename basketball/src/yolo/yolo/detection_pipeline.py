@@ -7,6 +7,7 @@ import cv2
 import torch
 import timm
 import numpy as np
+import tomllib
 from collections import defaultdict
 from ultralytics import YOLO
 import supervision as sv
@@ -29,7 +30,12 @@ class DetectionPipeline:
     def __init__(self, model_path: str, video_path: str):
         self.model = YOLO(model_path)
         self.video_path = video_path
-        self.yolo_input_size = 640
+        
+        # 加载配置
+        BASE_DIR = get_package_share_directory('assets')
+        CONFIG_PATH = os.path.join(BASE_DIR, 'config.toml')
+        with open(CONFIG_PATH, 'rb') as f:
+            self.config = tomllib.load(f)
 
     def process_with_yolo_tracking(
         self,
@@ -61,10 +67,10 @@ class DetectionPipeline:
             # 使用 YOLO 跟踪
             result = self.model.track(
                 frame,
-                imgsz=self.yolo_input_size,
-                conf=0.4,
-                iou=0.1,
-                max_det=2,
+                imgsz=self.config['yolo']['yolo_input_size'],
+                conf=self.config['yolo']['conf_yolo_tracking'],
+                iou=self.config['yolo']['iou'],
+                max_det=self.config['yolo']['max_det'],
                 tracker=tracker_config
             )[0]
 
@@ -127,15 +133,15 @@ class DetectionPipeline:
 
         feature_extractor = DeepSORTFeatureExtractor(
             timm_model,
-            device="cuda",
-            input_size=(128, 128)
+            device=self.config['yolo']['device'],
+            input_size=tuple(self.config['yolo']['feature_extractor_input_size'])
         )
 
         tracker = DeepSORTTracker(
             feature_extractor=feature_extractor,
-            device="cuda",
-            lost_track_buffer=50,
-            appearance_weight=0.7
+            device=self.config['yolo']['device'],
+            lost_track_buffer=self.config['yolo']['lost_track_buffer'],
+            appearance_weight=self.config['yolo']['appearance_weight']
         )
 
         while cap.isOpened():
@@ -147,7 +153,7 @@ class DetectionPipeline:
                 break
 
             # 检测
-            result = self.model.predict(source=frame, conf=0.21, iou=0.1, max_det=2)[0]
+            result = self.model.predict(source=frame, conf=self.config['yolo']['conf_deepsort'], iou=self.config['yolo']['iou'], max_det=self.config['yolo']['max_det'])[0]
             detections = sv.Detections.from_ultralytics(result)
             detections = tracker.update(detections, frame)
 

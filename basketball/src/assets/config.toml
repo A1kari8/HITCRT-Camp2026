@@ -1,0 +1,28 @@
+[paths]
+video_path = "test5/rgb.mp4"
+output_path = "output.mp4"
+model_path = "best-blur-video.pt"
+tracker_config = "mytracker.yaml"
+
+[draw]
+trail_length = 100000
+enable_color_fade = true
+enable_size_variation = false
+base_radius = 30
+max_trail_length = 300000
+enable_interpolation_color = true
+enable_3d_plot = true
+
+[yolo]
+yolo_input_size = 640
+conf_yolo_tracking = 0.4
+conf_deepsort = 0.21
+iou = 0.1
+max_det = 2
+lost_track_buffer = 50
+appearance_weight = 0.7
+device = "cuda"
+feature_extractor_input_size = [128, 128]
+
+[ukf]
+fps_rate = 6

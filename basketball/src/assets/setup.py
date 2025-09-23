@@ -15,6 +15,7 @@ setup(
         ('share/' + package_name, ['mytracker.yaml']),
         ('share/' + package_name, ['v1.pt']),
         ('share/' + package_name, ['pytorch_model.bin']),
+        ('share/' + package_name, ['config.toml']),
         ('share/' + package_name + '/test1', ['videos/test1/rgb.mp4']),
         ('share/' + package_name + '/test2', ['videos/test2/rgb.mp4']),
         ('share/' + package_name + '/test3', ['videos/test3/rgb.mp4']),
