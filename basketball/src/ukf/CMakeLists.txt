@@ -11,9 +11,11 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(ament_index_cpp REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 add_executable(ukf src/main.cpp src/KalmanFilter.cpp src/UnscentedKalmanFilter.cpp src/KalmanFilterJerk.cpp src/UnscentedKalmanFilterJerk.cpp)
-ament_target_dependencies(ukf rclcpp std_msgs)
+ament_target_dependencies(ukf rclcpp std_msgs visualization_msgs geometry_msgs)
 
 target_include_directories(ukf PUBLIC
   $<BUILD_INTERFACE:${EIGEN3_INCLUDE_DIR}>

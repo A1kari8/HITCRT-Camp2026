@@ -10,10 +10,13 @@ import os
 import tomllib
 from typing import Dict
 from ament_index_python.packages import get_package_share_directory
+import time
 
 from .trajectory import TrajectoryPoint, BallTrajectory
 from .camera_utils import load_camera_params
 from .video_processor import VideoProcessor
+
+import cv2
 
 BASE_DIR = get_package_share_directory('assets')
 CONFIG_PATH = os.path.join(BASE_DIR, 'config.toml')
@@ -34,7 +37,7 @@ class TrajectoryVisualizer(Node):
         super().__init__('trajectory_visualizer')
         from rclpy.qos import QoSProfile, QoSReliabilityPolicy
         # 使用可靠QoS策略，防止消息丢失
-        qos = QoSProfile(depth=100, reliability=QoSReliabilityPolicy.RELIABLE)
+        qos = QoSProfile(depth=10000, reliability=QoSReliabilityPolicy.RELIABLE)
         self.subscription = self.create_subscription(
             Float32MultiArray,
             'ball_trajectory',
@@ -57,6 +60,16 @@ class TrajectoryVisualizer(Node):
         self.declare_parameter('base_radius', config['draw']['base_radius'])  # 基准半径
         self.declare_parameter('max_trail_length', config['draw']['max_trail_length'])  # 最大轨迹长度限制
         self.declare_parameter('enable_interpolation_color', config['draw']['enable_interpolation_color'])  # 是否启用插帧颜色区分
+        self.declare_parameter('enable_real_time_display', config['draw']['enable_real_time_display'])  # 是否启用实时轨迹显示
+
+        # 如果启用实时显示，创建OpenCV窗口
+        if self.get_parameter('enable_real_time_display').get_parameter_value().bool_value:
+            cv2.namedWindow('Real-time Trajectory', cv2.WINDOW_NORMAL)
+
+        # FPS计算变量
+        self.fps_frame_count = 0
+        self.fps_start_time = time.time()
+        self.current_fps = 0.0
 
         # 状态变量
         self.last_frame_num = None
@@ -71,7 +84,7 @@ class TrajectoryVisualizer(Node):
     def on_trajectory_received(self, msg: Float32MultiArray) -> None:
         """
         轨迹消息回调：解析并缓存每个球的三维轨迹点。
-        :param msg: ROS2 Float32MultiArray，每5个float为[ball_id, x, y, z, frame_num]
+        :param msg: ROS2 Float32MultiArray,每5个float为[ball_id, x, y, z, frame_num]
         """
         if not msg.data:
             return
@@ -84,6 +97,15 @@ class TrajectoryVisualizer(Node):
             self.timeout_timer = self.create_timer(5.0, self.check_timeout)
 
         self.get_logger().info(f"[RECV] ball_trajectory: {[round(x, 4) for x in msg.data]}")
+
+        # 更新FPS（每处理一个点就算一帧）
+        self.fps_frame_count += 1
+        current_time = time.time()
+        time_diff = current_time - self.fps_start_time
+        if time_diff >= 1.0:
+            self.current_fps = self.fps_frame_count / time_diff
+            self.fps_frame_count = 0
+            self.fps_start_time = current_time
 
         # 解析消息
         ball_id = int(msg.data[0])
@@ -130,7 +152,7 @@ class TrajectoryVisualizer(Node):
                 max_trail_length = 300
                 enable_interpolation_color = False
             
-            self.get_logger().info(f"使用绘制参数: trail_length={trail_length}, color_fade={enable_color_fade}, size_var={enable_size_variation}, base_radius={base_radius}, interp_color={enable_interpolation_color}")
+            # self.get_logger().info(f"使用绘制参数: trail_length={trail_length}, color_fade={enable_color_fade}, size_var={enable_size_variation}, base_radius={base_radius}, interp_color={enable_interpolation_color}")
             
             self.video_processor.draw_trajectory_on_frame(
                 frame, self.ball_trajectories, self.last_frame_num,
@@ -143,6 +165,13 @@ class TrajectoryVisualizer(Node):
                 enable_interpolation_color=enable_interpolation_color
             )
             self.video_processor.write_frame(frame)
+
+            # 如果启用实时显示，更新OpenCV窗口
+            if self.get_parameter('enable_real_time_display').get_parameter_value().bool_value:
+                # 在帧上绘制FPS
+                cv2.putText(frame, f'FPS: {self.current_fps:.2f}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                cv2.imshow('Real-time Trajectory', frame)
+                cv2.waitKey(1)
 
         self.last_frame_num = frame_num
 
@@ -180,6 +209,9 @@ class TrajectoryVisualizer(Node):
     def shutdown(self) -> None:
         """释放资源。"""
         self.video_processor.release()
+        # 销毁实时显示窗口
+        if self.get_parameter('enable_real_time_display').get_parameter_value().bool_value:
+            cv2.destroyAllWindows()
 
 
 def main() -> None:

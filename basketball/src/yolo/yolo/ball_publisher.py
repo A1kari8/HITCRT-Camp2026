@@ -22,7 +22,7 @@ class BallPublisher(Node):
     def __init__(self) -> None:
         super().__init__('ball_publisher')
         from rclpy.qos import QoSProfile, QoSReliabilityPolicy
-        qos = QoSProfile(depth=100, reliability=QoSReliabilityPolicy.RELIABLE)
+        qos = QoSProfile(depth=10000, reliability=QoSReliabilityPolicy.RELIABLE)
         self.position_publisher = self.create_publisher(Float32MultiArray, 'ball_position', qos)
         self.fps_publisher = self.create_publisher(Float32MultiArray, 'ball_fps', qos)
 

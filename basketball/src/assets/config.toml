@@ -11,12 +11,15 @@ enable_size_variation = false
 base_radius = 30
 max_trail_length = 300000
 enable_interpolation_color = true
-enable_3d_plot = true
+enable_3d_plot = false
+enable_matplotlib_plot = false
+matplotlib_plot_save_path = "trajectory_3d_plot.png"
+enable_real_time_display = true
 
 [yolo]
 yolo_input_size = 640
 conf_yolo_tracking = 0.4
-conf_deepsort = 0.21
+conf_deepsort = 0.2
 iou = 0.1
 max_det = 2
 lost_track_buffer = 50
@@ -25,4 +28,4 @@ device = "cuda"
 feature_extractor_input_size = [128, 128]
 
 [ukf]
-fps_rate = 6
+fps_rate = 12

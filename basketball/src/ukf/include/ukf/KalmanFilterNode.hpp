@@ -10,6 +10,9 @@
 #include "ukf/KalmanFilter.hpp"
 #include "ukf/UnscentedKalmanFilter.hpp"
 
+#include <visualization_msgs/msg/marker.hpp>
+#include <geometry_msgs/msg/point.hpp>
+
 /**
  * @brief
  * ROS2节点：负责接收篮球检测结果，进行卡尔曼滤波插帧，并周期性发布平滑轨迹。
@@ -60,7 +63,11 @@ class KalmanFilterNode : public rclcpp::Node {
      */
     void publishTrajectory(int ballId, int frameNum);
 
+    void publish_points(float posX, float posY, float posZ, int ballId);
+
     int lastFrameNum = 0;
+    bool isFirstMessage = true;
+    bool isSecondMessage = true;
 
     float dt_frame;
     float dt_origin;
@@ -75,12 +82,15 @@ class KalmanFilterNode : public rclcpp::Node {
 
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr
         m_fpsSubscription;
+
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr
+        m_markerPublisher;  ///< 发布RViz可视化Marker
 };
 
 template <typename FilterType>
 KalmanFilterNode<FilterType>::KalmanFilterNode()
     : rclcpp::Node("kalman_filter_node") {
-    rclcpp::QoS qos_profile(100);
+    rclcpp::QoS qos_profile(10000);
     qos_profile.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
     m_subscription =
         this->create_subscription<std_msgs::msg::Float32MultiArray>(
@@ -95,6 +105,11 @@ KalmanFilterNode<FilterType>::KalmanFilterNode()
             "ball_fps", qos_profile,
             std::bind(&KalmanFilterNode<FilterType>::fpsCallback, this,
                       std::placeholders::_1));
+
+    m_markerPublisher =
+        this->create_publisher<visualization_msgs::msg::Marker>(
+            "ball_marker", qos_profile);
+
     dt_frame =
         (1.0f / 29.9f) / static_cast<float>(FPS_RATE);  // 视频帧间隔 / 插帧倍数
 }
@@ -132,11 +147,17 @@ void KalmanFilterNode<FilterType>::ballPositionCallback(
     }
 
     if (m_kalmanFiltersMap[ballId]->m_firstMessageReceived) {
-        lastFrameNum = frameNum;
+        if (isFirstMessage) {
+            lastFrameNum = frameNum;
+            isFirstMessage = false;
+        }
         m_kalmanFiltersMap[ballId]->m_firstMessageReceived = false;
         return;
     } else if (m_kalmanFiltersMap[ballId]->m_secondMessageReceived) {
-        lastFrameNum = frameNum;
+        if (isSecondMessage) {
+            lastFrameNum = frameNum;
+            isSecondMessage = false;
+        }
         m_kalmanFiltersMap[ballId]->setVelocity(
             (posX - m_kalmanFiltersMap[ballId]->getState()[0]) / dt_origin,
             (posY - m_kalmanFiltersMap[ballId]->getState()[1]) / dt_origin,
@@ -147,6 +168,7 @@ void KalmanFilterNode<FilterType>::ballPositionCallback(
 
     // 丢帧插值
     if (frameNum - lastFrameNum > 1) {
+        printf("\033[33m[WARN] detect lose\033[0m\n");
         interpolateFrames(ballId, lastFrameNum, frameNum);
     }
     lastFrameNum = frameNum;
@@ -190,4 +212,32 @@ void KalmanFilterNode<FilterType>::publishTrajectory(int ballId, int frameNum) {
     printf("[SEND] ball_trajectory: [%d, %.4f, %.4f, %.4f, %d]\n", ballId,
            state[0], state[1], state[2], frameNum);
     m_publisher->publish(msg);
+    publish_points(state[0], state[1], state[2], ballId);
+}
+
+template <typename FilterType>
+void KalmanFilterNode<FilterType>::publish_points(float posX, float posY, float posZ, int ballId) {
+        auto marker = visualization_msgs::msg::Marker();
+        marker.header.frame_id = "map";
+        marker.header.stamp = this->now();
+        marker.ns = "points";
+        marker.id = this->now().nanoseconds();
+        marker.type = visualization_msgs::msg::Marker::SPHERE;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+
+        marker.pose.position.x = posX;
+        marker.pose.position.y = posZ;
+        marker.pose.position.z = -posY;
+        marker.pose.orientation.w = 1.0;
+
+        marker.scale.x = 0.1;
+        marker.scale.y = 0.1;
+        marker.scale.z = 0.1;
+
+        marker.color.r = (ballId % 3 == 0) ? 1.0 : 0.0;
+        marker.color.g = (ballId % 3 == 1) ? 1.0 : 0.0;
+        marker.color.b = (ballId % 3 == 2) ? 1.0 : 0.0;
+        marker.color.a = 1.0;
+
+        m_markerPublisher->publish(marker);
 }
