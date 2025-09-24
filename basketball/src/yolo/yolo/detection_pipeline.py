@@ -1,5 +1,5 @@
 """
-检测流水线模块
+检测
 """
 
 import os
@@ -8,9 +8,11 @@ import torch
 import timm
 import numpy as np
 import tomllib
+import time
 from collections import defaultdict
 from ultralytics import YOLO
 import supervision as sv
+from colorama import Fore, Style
 from typing import TYPE_CHECKING
 
 from ament_index_python.packages import get_package_share_directory
@@ -25,7 +27,7 @@ if TYPE_CHECKING:
 
 class DetectionPipeline:
     """
-    篮球检测和跟踪流水线。
+    篮球检测跟踪
     """
     def __init__(self, model_path: str, video_path: str):
         self.model = YOLO(model_path)
@@ -44,7 +46,7 @@ class DetectionPipeline:
             depth_path = os.path.join(BASE_DIR, self.config['paths']['depth_path'])
             self.depth_cap = cv2.VideoCapture(depth_path)
             if not self.depth_cap.isOpened():
-                print(f"[ERROR] 无法打开深度视频: {depth_path}")
+                print(f"{Fore.RED}[ERROR]{Style.RESET_ALL} 无法打开深度视频: {depth_path}")
                 self.enable_depth = False
 
     def process_with_yolo_tracking(
@@ -54,7 +56,7 @@ class DetectionPipeline:
         publisher: 'BallPublisher'
     ) -> None:
         """
-        使用 YOLO 内置跟踪进行检测和发布。
+        使用 YOLO 内置跟踪
         """
         cap = cv2.VideoCapture(self.video_path)
         frame_count = 0
@@ -74,7 +76,7 @@ class DetectionPipeline:
                 print("视频读取完毕或出错")
                 break
 
-            # 使用 YOLO 跟踪
+            # 使用YOLO跟踪
             result = self.model.track(
                 frame,
                 imgsz=self.config['yolo']['yolo_input_size'],
@@ -89,7 +91,7 @@ class DetectionPipeline:
 
             xywh_boxes = result.boxes.xywh.cpu().numpy()  # type: ignore
             track_ids = result.boxes.id.int().cpu().tolist() if result.boxes.id is not None else [2]  # type: ignore
-            # 标准化跟踪 ID
+            # 标准化ID
             track_ids = [1 if tid == 1 else 2 for tid in track_ids]
 
             for xywh_box, track_id in zip(xywh_boxes, track_ids):
@@ -124,13 +126,14 @@ class DetectionPipeline:
         publisher: 'BallPublisher'
     ) -> None:
         """
-        使用 DeepSORT 进行检测和跟踪。
+        使用 DeepSORT
         """
         cap = cv2.VideoCapture(self.video_path)
         frame_count = 0
+        fps_list = []
 
         fps = cap.get(cv2.CAP_PROP_FPS)
-        print(f"[INFO] 视频FPS: {fps}")
+        print(f"{Fore.GREEN}[INFO]{Style.RESET_ALL} 视频FPS: {fps}")
         publisher.publish_fps(fps)
 
         # 初始化 DeepSORT
@@ -156,6 +159,7 @@ class DetectionPipeline:
 
         while cap.isOpened():
             success, frame = cap.read()
+            frame_start = time.time()
             frame_count = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
 
             # 读取深度帧
@@ -167,11 +171,11 @@ class DetectionPipeline:
                     if len(depth_frame.shape) == 3:
                         depth_frame = cv2.cvtColor(depth_frame, cv2.COLOR_BGR2GRAY)
                 else:
-                    print(f"[WARNING] 深度帧读取失败，帧 {frame_count}")
+                    print(f"{Fore.YELLOW}[WARNING]{Style.RESET_ALL} 深度帧读取失败，帧 {frame_count}")
                     depth_frame = None
 
             if not success:
-                print("视频读取完毕或出错")
+                print(f"{Fore.BLUE}[INFO]{Style.RESET_ALL} 视频读取完毕或出错")
                 break
 
             # 检测
@@ -197,8 +201,6 @@ class DetectionPipeline:
                 if track_id != 0:
                     track_id = 1
 
-                print(f"[DETECT] id={track_id}, x={center_x:.1f}, y={center_y:.1f}, w={w:.1f}, h={h:.1f}, frame={frame_count}")
-
                 if radius > 2:
                     # 计算三维位置
                     position_3d = BallDetection.calculate_3d_position(
@@ -213,4 +215,16 @@ class DetectionPipeline:
                         )
                         publisher.publish_position(ball_detection)
 
+            frame_end = time.time()
+            processing_time = frame_end - frame_start
+            if processing_time > 0:
+                fps = 1.0 / processing_time
+                fps_list.append(fps)
+
         cap.release()
+
+        if fps_list:
+            average_fps = sum(fps_list) / len(fps_list)
+            print(f"{Fore.GREEN}[INFO]{Style.RESET_ALL} 总平均帧率: {average_fps:.2f} FPS")
+        else:
+            print(f"{Fore.YELLOW}[WARNING]{Style.RESET_ALL} 没有处理任何帧，无法计算平均帧率")

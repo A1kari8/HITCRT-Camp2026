@@ -6,7 +6,7 @@
 
 int main(int argc, char* argv[]) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<KalmanFilterNode<UnscentedKalmanFilterJerk>>());
+    rclcpp::spin(std::make_shared<hitcrt::KalmanFilterNode<hitcrt::UnscentedKalmanFilterJerk>>());
     rclcpp::shutdown();
     return 0;
 }

@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools','ultralytics','opencv-python','trackers'],
+    install_requires=['setuptools','ultralytics','opencv-python','trackers','colorama'],
     zip_safe=True,
     maintainer='alkaid',
     maintainer_email='xinlai.gao2006@outlook.com',

@@ -4,6 +4,8 @@
 
 #include "ukf/Constant.hpp"
 
+namespace hitcrt {
+
 /**
  * @brief 12维无迹卡尔曼滤波器（包含jerk）
  * 状态向量：[x, y, z, vx, vy, vz, ax, ay, az, jx, jy, jz]
@@ -21,12 +23,12 @@ class UnscentedKalmanFilterJerk {
                               float dt = 1.0f / (29.8f * FPS_RATE));
 
     /**
-     * @brief 仅用预测状态。
+     * @brief 预测
      */
     void predict(float dt);
 
     /**
-     * @brief 用新观测更新状态。
+     * @brief 用新观测更新
      * @param x 新观测x
      * @param y 新观测y
      * @param z 新观测z
@@ -34,32 +36,45 @@ class UnscentedKalmanFilterJerk {
     void update(float x, float y, float z);
 
     /**
-     * @brief 获取当前状态的三维位置。
+     * @brief 获取当前状态的三维位置
      */
     std::vector<float> getState() const;
 
+    /**
+     * @brief 设置初始速度（用于第二次观测时）
+     */
     void setVelocity(float vx, float vy, float vz);
 
+    /**
+     * @brief 更新状态转移矩阵
+     */
     void updateTransitionMatrix(float dt);
+
+    /**
+     * @brief 更新过程噪声协方差矩阵
+     */
     void updateProcessNoise(float dt);
 
     bool m_firstMessageReceived = true;
     bool m_secondMessageReceived = true;
 
    private:
-    int L;  // 状态维度 (12)
-    int numSigmaPoints;  // sigma点数量 (25)
+    int L;                     // 状态维度 (12)
+    int numSigmaPoints;        // sigma点数量 (25)
     float alpha, beta, kappa;  // UKF参数
 
-    Eigen::Matrix<float, 12, 1> m_state;       ///< 状态向量[x, y, z, vx, vy, vz, ax, ay, az, jx, jy, jz]
-    Eigen::Matrix<float, 12, 12> m_covariance; ///< 协方差矩阵
-    Eigen::Matrix<float, 12, 12> m_transition; ///< 状态转移矩阵
+    Eigen::Matrix<float, 12, 1>
+        m_state;  ///< 状态向量[x, y, z, vx, vy, vz, ax, ay, az, jx, jy, jz]
+    Eigen::Matrix<float, 12, 12> m_covariance;    ///< 协方差矩阵
+    Eigen::Matrix<float, 12, 12> m_transition;    ///< 状态转移矩阵
     Eigen::Matrix<float, 12, 12> m_processNoise;  ///< 过程噪声协方差
-    Eigen::Matrix<float, 3, 12> m_observation;   ///< 观测矩阵
-    Eigen::Matrix3f m_observationNoise;         ///< 观测噪声协方差
+    Eigen::Matrix<float, 3, 12> m_observation;    ///< 观测矩阵
+    Eigen::Matrix3f m_observationNoise;           ///< 观测噪声协方差
 
     // UKF相关变量
     Eigen::Matrix<float, 12, Eigen::Dynamic> sigmaPoints;
     Eigen::VectorXf weightsMean;
     Eigen::VectorXf weightsCovariance;
 };
+
+}  // namespace hitcrt

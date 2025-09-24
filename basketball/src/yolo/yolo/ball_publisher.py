@@ -1,5 +1,5 @@
 """
-篮球位置发布模块
+篮球位置发布
 """
 
 import time
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 class BallPublisher(Node):
     """
-    ROS2节点：负责发布检测到的篮球三维位置。
+    ROS2节点
     """
     def __init__(self) -> None:
         super().__init__('ball_publisher')
@@ -28,7 +28,7 @@ class BallPublisher(Node):
 
     def wait_for_subscribers(self, timeout_sec: int = 10) -> None:
         """
-        等待订阅者连接，避免消息丢失。
+        等待连接
         """
         start = time.time()
         while self.position_publisher.get_subscription_count() == 0:
@@ -40,7 +40,7 @@ class BallPublisher(Node):
 
     def publish_position(self, ball_detection: 'BallDetection') -> None:
         """
-        发布篮球的三维位置。
+        发布位置
         """
         msg = Float32MultiArray()
         msg.data = [
@@ -50,7 +50,7 @@ class BallPublisher(Node):
             float(ball_detection.z),
             float(ball_detection.frame_num)
         ]
-        self.get_logger().info(f"[SEND] ball_position: {[round(x, 4) for x in msg.data]}")
+        # self.get_logger().info(f"Published ball position for ID {int(msg.data[0])}")
         self.position_publisher.publish(msg)
 
     def publish_fps(self, fps: float) -> None:

@@ -1,8 +1,3 @@
-
-"""
-篮球检测和发布ROS2节点
-"""
-
 import os
 import tomllib
 import rclpy
@@ -26,7 +21,7 @@ VIDEO_PATH = os.path.join(BASE_DIR, config['paths']['video_path'])
 
 def main() -> None:
     """
-    主入口：加载参数，初始化ROS2节点，检测并发布。
+    主入口
     """
     # 加载相机参数
     camera_matrix, dist_coeffs = load_camera_params()

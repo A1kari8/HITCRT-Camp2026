@@ -1,5 +1,5 @@
 """
-相机参数加载模块
+相机参数
 """
 
 import json
@@ -11,7 +11,7 @@ from ament_index_python.packages import get_package_share_directory
 
 def load_camera_params() -> Tuple[np.ndarray, np.ndarray]:
     """
-    读取相机标定参数（内参和畸变），返回相机矩阵和畸变系数。
+    读取相机参数
     """
     base_dir = get_package_share_directory('assets')
     calib_path = os.path.join(base_dir, 'calibration.json')

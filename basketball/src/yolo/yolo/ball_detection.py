@@ -1,5 +1,5 @@
 """
-篮球检测和定位模块
+篮球检测
 """
 
 import cv2
@@ -9,7 +9,7 @@ from typing import Tuple, Optional
 
 class BallDetection:
     """
-    表示检测到的篮球及其三维位置信息。
+    位置信息
     """
     def __init__(self, ball_id: int, x: float, y: float, z: float, x2d: float, y2d: float, frame_num: int) -> None:
         self.ball_id = ball_id
@@ -32,7 +32,7 @@ class BallDetection:
         depth_frame: Optional[np.ndarray] = None
     ) -> Optional[Tuple[float, float, float]]:
         """
-        使用 PnP 算法或深度图计算篮球的三维位置。
+        计算三维位置。
 
         Args:
             center_x: 检测框中心 x 坐标
@@ -45,7 +45,7 @@ class BallDetection:
             depth_frame: 深度帧（单通道，深度值单位为米）
 
         Returns:
-            三维位置 (x, y, z) 或 None（如果计算失败）
+            三维位置xyz
         """
         if enable_depth and depth_frame is not None:
             # 使用深度图获取Z，然后反投影计算X,Y
@@ -63,25 +63,23 @@ class BallDetection:
             # 如果深度无效，回退到PnP
             print(f"[WARNING] 深度值无效，回退到PnP: z={depth_frame[cy, cx] if depth_frame is not None else 'N/A'}")
 
-        # 使用 PnP 算法
         object_points = np.array([
-            # [0, 0, 0],  # 球心
+            # [0, 0, 0],
             [ball_radius_m, 0, 0],
             [-ball_radius_m, 0, 0],
             [0, ball_radius_m, 0],
             [0, -ball_radius_m, 0]
         ], dtype=np.float32)
 
-        # 定义对应的2D图像点
+        # 2D点
         image_points = np.array([
-            # [center_x, center_y],  # 球心投影
+            # [center_x, center_y],
             [center_x + radius, center_y],
             [center_x - radius, center_y],
             [center_x, center_y + radius],
             [center_x, center_y - radius]
         ], dtype=np.float32)
 
-        # 使用 PnP 求解
         success, rvec, tvec = cv2.solvePnP(
             object_points, image_points, camera_matrix, dist_coeffs,
             flags=cv2.SOLVEPNP_AP3P
@@ -98,11 +96,11 @@ class BallDetection:
         dist_coeffs: np.ndarray
     ) -> Tuple[float, float]:
         """
-        将三维点投影到图像平面。
+        三维点投影到平面
 
         Args:
             position_3d: 三维位置 (x, y, z)
-            camera_matrix: 相机内参矩阵
+            camera_matrix: 相机内参
             dist_coeffs: 畸变系数
 
         Returns:

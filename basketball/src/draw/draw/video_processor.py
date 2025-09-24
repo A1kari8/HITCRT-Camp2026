@@ -5,7 +5,7 @@
 import cv2
 import numpy as np
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from ament_index_python.packages import get_package_share_directory
 
 from .trajectory import TrajectoryPoint, BallTrajectory
@@ -127,7 +127,8 @@ class VideoProcessor:
         enable_size_variation: bool = True,
         base_radius: int = 30,
         max_trail_length: int = 300,
-        enable_interpolation_color: bool = False
+        enable_interpolation_color: bool = False,
+        fps: Optional[float] = None
     ) -> None:
         """
         补写剩余帧。
@@ -148,6 +149,11 @@ class VideoProcessor:
                                              base_radius=base_radius, 
                                              max_trail_length=max_trail_length,
                                              enable_interpolation_color=enable_interpolation_color)
+                
+                # 绘制平均FPS
+                if fps is not None:
+                    cv2.putText(frame, f'Avg FPS: {fps:.2f}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                
                 self.out.write(frame)
             else:
                 break

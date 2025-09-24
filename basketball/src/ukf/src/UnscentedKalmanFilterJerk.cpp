@@ -2,10 +2,12 @@
 
 #include <vector>
 
+using namespace hitcrt;
+
 UnscentedKalmanFilterJerk::UnscentedKalmanFilterJerk(float x, float y, float z,
                                                      float dt) {
     // UKF参数初始化
-    L = 12;  // 状态维度
+    L = 12;                      // 状态维度
     numSigmaPoints = 2 * L + 1;  // 25个sigma点
     alpha = sqrt(3.0f);
     beta = 2.0f;
@@ -16,12 +18,12 @@ UnscentedKalmanFilterJerk::UnscentedKalmanFilterJerk(float x, float y, float z,
 
     // 观测矩阵初始化 (3x12) - 只观测位置
     m_observation.setZero();
-    m_observation.block<3,3>(0,0) = Eigen::Matrix3f::Identity();
+    m_observation.block<3, 3>(0, 0) = Eigen::Matrix3f::Identity();
 
     // 协方差初始化
     m_covariance.setIdentity();
     for (int i = 0; i < 3; ++i) {
-        m_covariance(i, i) = 0.1f;     // 位置初始方差 (10cm)
+        m_covariance(i, i) = 0.1f;           // 位置初始方差 (10cm)
         m_covariance(i + 3, i + 3) = 1.0f;   // 速度初始方差 (1m/s)
         m_covariance(i + 6, i + 6) = 4.0f;   // 加速度初始方差 (2m/s²)
         m_covariance(i + 9, i + 9) = 16.0f;  // jerk初始方差 (4m/s³)
@@ -50,39 +52,44 @@ void UnscentedKalmanFilterJerk::updateTransitionMatrix(float dt) {
     m_transition.setIdentity();
 
     // 位置 ← 速度
-    m_transition.block<3,3>(0,3) = Eigen::Matrix3f::Identity() * dt;
+    m_transition.block<3, 3>(0, 3) = Eigen::Matrix3f::Identity() * dt;
 
     // 位置 ← 加速度
-    m_transition.block<3,3>(0,6) = Eigen::Matrix3f::Identity() * 0.5f * dt * dt;
+    m_transition.block<3, 3>(0, 6) =
+        Eigen::Matrix3f::Identity() * 0.5f * dt * dt;
 
     // 位置 ← jerk
-    m_transition.block<3,3>(0,9) = Eigen::Matrix3f::Identity() * (1.0f/6.0f) * dt * dt * dt;
+    m_transition.block<3, 3>(0, 9) =
+        Eigen::Matrix3f::Identity() * (1.0f / 6.0f) * dt * dt * dt;
 
     // 速度 ← 加速度
-    m_transition.block<3,3>(3,6) = Eigen::Matrix3f::Identity() * dt;
+    m_transition.block<3, 3>(3, 6) = Eigen::Matrix3f::Identity() * dt;
 
     // 速度 ← jerk
-    m_transition.block<3,3>(3,9) = Eigen::Matrix3f::Identity() * 0.5f * dt * dt;
+    m_transition.block<3, 3>(3, 9) =
+        Eigen::Matrix3f::Identity() * 0.5f * dt * dt;
 
     // 加速度 ← jerk
-    m_transition.block<3,3>(6,9) = Eigen::Matrix3f::Identity() * dt;
+    m_transition.block<3, 3>(6, 9) = Eigen::Matrix3f::Identity() * dt;
 }
 
 void UnscentedKalmanFilterJerk::updateProcessNoise(float dt) {
     // 简化的过程噪声模型
     m_processNoise.setZero();
 
-    float sigma_pos = 0.01f;  // 位置过程噪声
-    float sigma_vel = 1.0f;   // 速度过程噪声
-    float sigma_acc = 6.0f;   // 加速度过程噪声
+    float sigma_pos = 0.01f;   // 位置过程噪声
+    float sigma_vel = 1.0f;    // 速度过程噪声
+    float sigma_acc = 6.0f;    // 加速度过程噪声
     float sigma_jerk = 12.0f;  // jerk过程噪声
 
     // 为每个维度设置对角过程噪声
     for (int i = 0; i < 3; ++i) {
-        m_processNoise(i, i) = sigma_pos * sigma_pos * dt;       // 位置噪声
-        m_processNoise(i + 3, i + 3) = sigma_vel * sigma_vel * dt; // 速度噪声
-        m_processNoise(i + 6, i + 6) = sigma_acc * sigma_acc * dt; // 加速度噪声
-        m_processNoise(i + 9, i + 9) = sigma_jerk * sigma_jerk * dt; // jerk噪声
+        m_processNoise(i, i) = sigma_pos * sigma_pos * dt;          // 位置噪声
+        m_processNoise(i + 3, i + 3) = sigma_vel * sigma_vel * dt;  // 速度噪声
+        m_processNoise(i + 6, i + 6) =
+            sigma_acc * sigma_acc * dt;  // 加速度噪声
+        m_processNoise(i + 9, i + 9) =
+            sigma_jerk * sigma_jerk * dt;  // jerk噪声
     }
 }
 

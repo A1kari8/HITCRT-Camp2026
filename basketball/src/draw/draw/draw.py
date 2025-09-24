@@ -11,6 +11,7 @@ import tomllib
 from typing import Dict
 from ament_index_python.packages import get_package_share_directory
 import time
+from colorama import Fore, Style
 
 from .trajectory import TrajectoryPoint, BallTrajectory
 from .camera_utils import load_camera_params
@@ -52,6 +53,11 @@ class TrajectoryVisualizer(Node):
 
         # 视频处理器
         self.video_processor = VideoProcessor(VIDEO_PATH, OUTPUT_PATH)
+        
+        # 获取视频信息
+        self.video_total_frames = int(self.video_processor.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.video_fps = self.video_processor.fps
+        self.video_duration = self.video_total_frames / self.video_fps if self.video_fps > 0 else 0
 
         # 绘制模式配置
         self.declare_parameter('trail_length', config['draw']['trail_length'])  # 轨迹长度（最近n个点）
@@ -70,6 +76,7 @@ class TrajectoryVisualizer(Node):
         self.fps_frame_count = 0
         self.fps_start_time = time.time()
         self.current_fps = 0.0
+        self.start_time = time.time()  # 记录节点启动时间
 
         # 状态变量
         self.last_frame_num = None
@@ -96,7 +103,7 @@ class TrajectoryVisualizer(Node):
             self.timeout_timer.cancel()
             self.timeout_timer = self.create_timer(5.0, self.check_timeout)
 
-        self.get_logger().info(f"[RECV] ball_trajectory: {[round(x, 4) for x in msg.data]}")
+        print(f"[RECV] {[round(x, 4) for x in msg.data]}")
 
         # 更新FPS（每处理一个点就算一帧）
         self.fps_frame_count += 1
@@ -115,7 +122,7 @@ class TrajectoryVisualizer(Node):
 
         # 首次接收消息时，快进视频
         if self.first_message_received:
-            self.get_logger().info(f"First message received, fast-forwarding video to frame {frame_num}...")
+            print(f"{Fore.GREEN}[INFO]{Style.RESET_ALL} First message received, fast-forwarding to frame {frame_num}")
             self.video_processor.fast_forward_to_frame(frame_num)
             self.first_message_received = False
 
@@ -144,15 +151,13 @@ class TrajectoryVisualizer(Node):
                 max_trail_length = self.get_parameter('max_trail_length').get_parameter_value().integer_value
                 enable_interpolation_color = self.get_parameter('enable_interpolation_color').get_parameter_value().bool_value
             except Exception as e:
-                self.get_logger().error(f"获取参数失败: {e}，使用默认值")
+                print(f"{Fore.RED}[ERROR]{Style.RESET_ALL} Failed to get parameters: {e}, using defaults")
                 trail_length = 170
                 enable_color_fade = True
                 enable_size_variation = True
                 base_radius = 30
                 max_trail_length = 300
-                enable_interpolation_color = False
-            
-            # self.get_logger().info(f"使用绘制参数: trail_length={trail_length}, color_fade={enable_color_fade}, size_var={enable_size_variation}, base_radius={base_radius}, interp_color={enable_interpolation_color}")
+                enable_interpolation_color = False            # self.get_logger().info(f"使用绘制参数: trail_length={trail_length}, color_fade={enable_color_fade}, size_var={enable_size_variation}, base_radius={base_radius}, interp_color={enable_interpolation_color}")
             
             self.video_processor.draw_trajectory_on_frame(
                 frame, self.ball_trajectories, self.last_frame_num,
@@ -164,6 +169,10 @@ class TrajectoryVisualizer(Node):
                 max_trail_length=max_trail_length,
                 enable_interpolation_color=enable_interpolation_color
             )
+            
+            # 在帧上绘制实时FPS
+            cv2.putText(frame, f'FPS: {self.current_fps:.2f}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
             self.video_processor.write_frame(frame)
 
             # 如果启用实时显示，更新OpenCV窗口
@@ -179,6 +188,11 @@ class TrajectoryVisualizer(Node):
         """
         在节点关闭时补写所有剩余帧，防止视频损坏或丢失帧。
         """
+        # 计算平均FPS
+        total_frames = sum(len(traj.points) for traj in self.ball_trajectories.values())
+        total_time = time.time() - self.start_time
+        average_fps = total_frames / total_time if total_time > 0 else 0.0
+        
         # 获取当前参数值
         try:
             trail_length = self.get_parameter('trail_length').get_parameter_value().integer_value
@@ -188,7 +202,7 @@ class TrajectoryVisualizer(Node):
             max_trail_length = self.get_parameter('max_trail_length').get_parameter_value().integer_value
             enable_interpolation_color = self.get_parameter('enable_interpolation_color').get_parameter_value().bool_value
         except Exception as e:
-            self.get_logger().error(f"获取参数失败: {e}，使用默认值")
+            print(f"{Fore.RED}[ERROR]{Style.RESET_ALL} Failed to get parameters: {e}, using defaults")
             trail_length = 170
             enable_color_fade = True
             enable_size_variation = True
@@ -203,11 +217,17 @@ class TrajectoryVisualizer(Node):
             enable_size_variation=enable_size_variation,
             base_radius=base_radius,
             max_trail_length=max_trail_length,
-            enable_interpolation_color=enable_interpolation_color
+            enable_interpolation_color=enable_interpolation_color,
+            fps=average_fps
         )
 
     def shutdown(self) -> None:
         """释放资源。"""
+        # 计算并输出平均FPS
+        total_frames = sum(len(traj.points) for traj in self.ball_trajectories.values())
+        average_fps = total_frames / self.video_duration if self.video_duration > 0 else 0.0
+        print(f"[INFO] 绘制结束，总平均帧率: {average_fps:.2f} FPS (总点数: {total_frames}, 视频时长: {self.video_duration:.2f}s)")
+        
         self.video_processor.release()
         # 销毁实时显示窗口
         if self.get_parameter('enable_real_time_display').get_parameter_value().bool_value:
