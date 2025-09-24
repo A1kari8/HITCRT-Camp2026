@@ -36,6 +36,16 @@ class DetectionPipeline:
         CONFIG_PATH = os.path.join(BASE_DIR, 'config.toml')
         with open(CONFIG_PATH, 'rb') as f:
             self.config = tomllib.load(f)
+        
+        # 如果启用深度定位，加载深度视频
+        self.enable_depth = self.config['yolo'].get('enable_depth_based_positioning', False)
+        self.depth_cap = None
+        if self.enable_depth:
+            depth_path = os.path.join(BASE_DIR, self.config['paths']['depth_path'])
+            self.depth_cap = cv2.VideoCapture(depth_path)
+            if not self.depth_cap.isOpened():
+                print(f"[ERROR] 无法打开深度视频: {depth_path}")
+                self.enable_depth = False
 
     def process_with_yolo_tracking(
         self,
@@ -148,6 +158,18 @@ class DetectionPipeline:
             success, frame = cap.read()
             frame_count = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
 
+            # 读取深度帧
+            depth_frame = None
+            if self.depth_cap is not None:
+                depth_success, depth_frame = self.depth_cap.read()
+                if depth_success and depth_frame is not None:
+                    # 确保深度帧是单通道
+                    if len(depth_frame.shape) == 3:
+                        depth_frame = cv2.cvtColor(depth_frame, cv2.COLOR_BGR2GRAY)
+                else:
+                    print(f"[WARNING] 深度帧读取失败，帧 {frame_count}")
+                    depth_frame = None
+
             if not success:
                 print("视频读取完毕或出错")
                 break
@@ -167,9 +189,9 @@ class DetectionPipeline:
                 x1, y1, x2, y2 = xyxy
                 center_x = (x2 - x1) / 2 + x1
                 center_y = (y2 - y1) / 2 + y1
-                w = x2 - x1
-                h = y2 - y1
-                radius = float(h / 2.0)
+                w = abs(x2 - x1)
+                h = abs(y2 - y1)
+                radius = float(max(w, h) / 2.0)
 
                 # 标准化跟踪 ID
                 if track_id != 0:
@@ -177,10 +199,11 @@ class DetectionPipeline:
 
                 print(f"[DETECT] id={track_id}, x={center_x:.1f}, y={center_y:.1f}, w={w:.1f}, h={h:.1f}, frame={frame_count}")
 
-                if radius > 5:
+                if radius > 2:
                     # 计算三维位置
                     position_3d = BallDetection.calculate_3d_position(
-                        center_x, center_y, radius, camera_matrix, dist_coeffs
+                        center_x, center_y, radius, camera_matrix, dist_coeffs,
+                        enable_depth=self.enable_depth, depth_frame=depth_frame
                     )
 
                     if position_3d:

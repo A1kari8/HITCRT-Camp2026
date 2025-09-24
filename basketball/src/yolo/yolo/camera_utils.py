@@ -17,6 +17,6 @@ def load_camera_params() -> Tuple[np.ndarray, np.ndarray]:
     calib_path = os.path.join(base_dir, 'calibration.json')
     with open(calib_path, 'r') as f:
         params = json.load(f)
-    camera_matrix = np.array(params['camera_matrix'], dtype=np.float32)
-    dist_coeffs = np.array(params['dist_coeffs'], dtype=np.float32).reshape(-1, 1)
+    camera_matrix = np.array(params['camera_matrix'], dtype=np.float64)
+    dist_coeffs = np.array(params['dist_coeffs'], dtype=np.float64).reshape(-1, 1)
     return camera_matrix, dist_coeffs

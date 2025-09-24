@@ -27,10 +27,12 @@ class BallDetection:
         radius: float,
         camera_matrix: np.ndarray,
         dist_coeffs: np.ndarray,
-        ball_radius_m: float = 0.123
+        ball_radius_m: float = 0.123,
+        enable_depth: bool = False,
+        depth_frame: Optional[np.ndarray] = None
     ) -> Optional[Tuple[float, float, float]]:
         """
-        使用 PnP 算法计算篮球的三维位置。
+        使用 PnP 算法或深度图计算篮球的三维位置。
 
         Args:
             center_x: 检测框中心 x 坐标
@@ -39,13 +41,31 @@ class BallDetection:
             camera_matrix: 相机内参矩阵
             dist_coeffs: 畸变系数
             ball_radius_m: 篮球半径（米）
+            enable_depth: 是否启用深度图定位
+            depth_frame: 深度帧（单通道，深度值单位为米）
 
         Returns:
             三维位置 (x, y, z) 或 None（如果计算失败）
         """
-        # 定义篮球的3D模型点（球心和球面上的点）
+        if enable_depth and depth_frame is not None:
+            # 使用深度图获取Z，然后反投影计算X,Y
+            cx, cy = int(center_x), int(center_y)
+            if 0 <= cx < depth_frame.shape[1] and 0 <= cy < depth_frame.shape[0]:
+                z = float(depth_frame[cy, cx]) / 1000.0 + 0.123 # 假设深度值是毫米，转为米
+                if z > 0:
+                    # 反投影
+                    points_2d = np.array([[center_x, center_y]], dtype=np.float32)
+                    undistorted = cv2.undistortPoints(points_2d, camera_matrix, dist_coeffs)
+                    x_norm, y_norm = undistorted[0][0]
+                    x = x_norm * z
+                    y = y_norm * z
+                    return float(x), float(y), float(z)
+            # 如果深度无效，回退到PnP
+            print(f"[WARNING] 深度值无效，回退到PnP: z={depth_frame[cy, cx] if depth_frame is not None else 'N/A'}")
+
+        # 使用 PnP 算法
         object_points = np.array([
-            [0, 0, 0],  # 球心
+            # [0, 0, 0],  # 球心
             [ball_radius_m, 0, 0],
             [-ball_radius_m, 0, 0],
             [0, ball_radius_m, 0],
@@ -54,7 +74,7 @@ class BallDetection:
 
         # 定义对应的2D图像点
         image_points = np.array([
-            [center_x, center_y],  # 球心投影
+            # [center_x, center_y],  # 球心投影
             [center_x + radius, center_y],
             [center_x - radius, center_y],
             [center_x, center_y + radius],
@@ -64,7 +84,7 @@ class BallDetection:
         # 使用 PnP 求解
         success, rvec, tvec = cv2.solvePnP(
             object_points, image_points, camera_matrix, dist_coeffs,
-            flags=cv2.SOLVEPNP_ITERATIVE
+            flags=cv2.SOLVEPNP_AP3P
         )
 
         if success:

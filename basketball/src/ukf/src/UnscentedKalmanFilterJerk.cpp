@@ -73,9 +73,9 @@ void UnscentedKalmanFilterJerk::updateProcessNoise(float dt) {
     m_processNoise.setZero();
 
     float sigma_pos = 0.01f;  // 位置过程噪声
-    float sigma_vel = 0.1f;   // 速度过程噪声
-    float sigma_acc = 1.0f;   // 加速度过程噪声
-    float sigma_jerk = 5.0f;  // jerk过程噪声
+    float sigma_vel = 1.0f;   // 速度过程噪声
+    float sigma_acc = 6.0f;   // 加速度过程噪声
+    float sigma_jerk = 12.0f;  // jerk过程噪声
 
     // 为每个维度设置对角过程噪声
     for (int i = 0; i < 3; ++i) {
